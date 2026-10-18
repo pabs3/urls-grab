@@ -544,6 +544,8 @@ local custom_item_urls = {}
 local maybe_discourse = {}
 local discourse_items = {[""]={}}
 local discord_refresh = {[""]={}}
+local maybe_gitlab = {}
+local gitlab_items = {[""]={}}
 
 local month_timestamp = os.date("%Y%m", timestamp)
 
@@ -1341,6 +1343,18 @@ wget.callbacks.download_child_p = function(urlpos, parent, depth, start_url_pars
     maybe_discourse[parenturl] = true
   end
 
+  if string.match(url, "/assets/webpack/gitlab_ui%.[a-f0-9]+%.chunk%.js$")
+     or string.match(url, "/assets/webpack/gitlab_ui%.[a-f0-9]+%.chunk%.js$")
+     or string.match(url, "/assets/gitlab%-sans/GitLabSans%-[a-f0-9]+%.woff2$")
+     or string.match(url, "/assets/gitlab%-mono/GitLabMono%-[a-f0-9]+%.woff2$")
+     or string.match(url, "/assets/gitlab%-mono/GitLabMono%-Italic%-[a-f0-9]+%.woff2$")
+     or string.match(url, "/assets/page_bundles/commit_description%-[a-f0-9]+%.css$")
+     or string.match(url, "/assets/webpack/commons%-pages%.registrations%.new%-pages%.sessions%.new%.[a-f0-9]+%.chunk%.js$")
+     or string.match(url, "/assets/webpack/commons%-pages%.groups%.new%-pages%.import%.gitlab_projects%.new%-pages%.import%.manifest%.new%-pages%.projects%.n%-[a-f0-9]+%.[a-f0-9]+%.chunk%.js$")
+  then
+    maybe_gitlab[parenturl] = true
+  end
+
   if url ~= parenturl
     and depth > 1
     and not skip_parent_urls_checked[url] then
@@ -1907,6 +1921,26 @@ wget.callbacks.get_urls = function(file, url, is_css, iri)
         end
       end
     end
+    if maybe_gitlab[url] then
+      html = read_file(file)
+      -- https://github.com/gitlabhq/gitlabhq/blob/master/lib/gitlab/gon_helper.rb
+      local gitlab_url = string.match(html, '; *gon%.gitlab_url *= *"^(https?://[^"]+)";')
+      if gitlab_url then
+        if not string.match(gitlab_url, "/$") then
+          gitlab_url = gitlab_url .. '/'
+        end
+        gitlab_items[""][gitlab_url] = current_url
+      else
+        -- https://gitlab.com/gitlab-org/gitlab-foss/-/blob/main/app/views/layouts/_head.html.haml
+        local gitlab_site_name = string.match(html, '<meta content="GitLab" property="og:site_name">'
+        if gitlab_site_name then
+          gitlab_path = string.match(html, 'data-root-path="[^"]+"')
+          if gitlab_path then
+            gitlab_url = urlparse.absolute(url, gitlab_path)
+            gitlab_items[""][gitlab_url] = current_url
+        end
+      end
+    end
     --[[for _, extension in {
       "docx",
       "epub",
@@ -2420,6 +2454,7 @@ wget.callbacks.finish = function(start_time, end_time, wall_time, numurls, total
     ["urls-sitemap-news-hu1y8xj3h0ildh1k"] = urls_sitemap_news,
     ["urls-news-6t9uc9xxz06gpt93"] = urls_news,
     ["discourse-inbox-kkrhbt6xax5ave98"] = discourse_items,
+    ["gitlab-inbox-vi5xieGhahghee6p"] = gitlab_items,
     ["youtube-gov-stash-adxooz0xve21nudy"] = gov_youtube_items,
     ["discord-cdn-refresh-xsdmjfxfdhnp7936"] = discord_refresh
   }) do
